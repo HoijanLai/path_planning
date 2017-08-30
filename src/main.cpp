@@ -259,10 +259,12 @@ int main() {
           double safe_gap = 20.0;
 
           bool too_close = false; // whether there's a car close enough ahead
-          double s_ul, s_ur =  999; // ul: upper left
-          double s_ll, s_lr = -999;
-          double s_u = 999;
-
+          double s_ul =  99999, s_ur =  99999; // ul: upper left
+          double s_ll = -99999, s_lr = -99999;
+          double s_u  =  99999;
+          double v_u = target_vel;
+          cout << "--------------------------" << endl;
+          cout << "sd of ego car : <" << car_s << ", " << car_d << ">" << endl;
           for (int i = 0; i < sensor_fusion.size(); ++i) {
             double d = sensor_fusion[i][idx_D];
             double vx = sensor_fusion[i][idx_VX];
@@ -271,10 +273,15 @@ int main() {
             double other_s = sensor_fusion[i][idx_S];
             double ahead_s = other_s + (double)pre_size*0.02*vn; // naive prediction of the car ahead
             double diff = ahead_s - car_s; 
+            cout << "sd of car #" << sensor_fusion[i][idx_ID] << " : <" << diff << ", " << d << ">" << endl;     
+
             // **[1]** set some flag for cars on the same lane
             if (d <= (4*lane+2)+2 && d >= (4*lane+2)-2 && diff > 0) {
               if (diff <= safe_dist) too_close = true;
-              if (diff < s_u)  s_u = diff;
+              if (diff < s_u) {
+                s_u = diff;
+                v_u = vn; 
+              }
             }
             // **[2]** right lane  
             else if (d > (4*lane+2)+2) {
@@ -289,20 +296,25 @@ int main() {
           }
 
 
-         // if (s_ur > s_u) s_ur = s_u;
-         // if (s_ul > s_u) s_ul = s_u;
+          if (s_ur > s_u) s_ur = s_u;
+          if (s_ul > s_u) s_ul = s_u;
           
           double gap_l = s_ul - s_ll;
           double gap_r = s_ur - s_lr;
-
+          cout << "----------------------------" << endl;
+          cout << "|" << s_ul << "|" << "0000000" << "|" << s_ur << "|" << endl;
+          cout << "|" << s_ll << "|" << "0000000" << "|" << s_lr << "|" << endl;
           // now handle too close case
           if (too_close) {
-            ref_vel -= 0.224; // about 5m/s^2 
-            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= car_s;
-            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= car_s; 
-            if      (l_ok &&  r_ok) lane--;
+            ref_vel -= 0.224; // about 5m/s^2        
+            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10;
+            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10; 
+            if      (l_ok &&  r_ok) {
+              if (gap_l > gap_r) lane--;
+              else               lane++; 
+            } 
             else if (l_ok && !r_ok) lane--;
-            else if (r_ok && !l_ok) lane++;         
+            else if (r_ok && !l_ok) lane++; 
           }
           else if (ref_vel < target_vel) {
             ref_vel += 0.224;
