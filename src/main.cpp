@@ -304,7 +304,7 @@ int main() {
           cout << "|" << s_ll << "|" << "0000000" << "|" << s_lr << "|" << endl;
           // now handle too close case
           if (too_close) {
-            ref_vel -= 0.224; // about 5m/s^2        
+            double pre_lane = lane;
             bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5;
             bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
             if      (l_ok &&  r_ok) {
@@ -313,6 +313,7 @@ int main() {
             } 
             else if (l_ok && !r_ok) lane--;
             else if (r_ok && !l_ok) lane++; 
+            if (pre_lane == lane) ref_vel -= 0.224;
           }
           else if (ref_vel < target_vel) {
             ref_vel += 0.224;
