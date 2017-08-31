@@ -243,10 +243,8 @@ int main() {
           cout << "============| " << "car s       : " << car_s << endl; 
           cout << "============| " << "car velocity: " << car_speed << endl;
 
-          if (pre_size > 0) {
-            cout << end_path_s - car_s << endl; 
-            car_s = end_path_s; // assume the car has realize to the end of the previous plan
-          }
+          double pred_s = car_s;
+          if (pre_size > 0) pred_s = end_path_s; // assume the car has realize to the end of the previous plan
 
           // Sensor Fusion Data, a list of all other cars on the same side of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
@@ -256,7 +254,7 @@ int main() {
           cout << "number of detected cars : " << sensor_fusion.size() << endl;
 
           double safe_dist = 30.0; 
-          double safe_gap = 20.0;
+          double safe_gap = 30.0;
 
           bool too_close = false; // whether there's a car close enough ahead
           double s_ul =  99999, s_ur =  99999; // ul: upper left
@@ -264,7 +262,7 @@ int main() {
           double s_u  =  99999;
           double v_u = target_vel;
           cout << "--------------------------" << endl;
-          cout << "sd of ego car : <" << car_s << ", " << car_d << ">" << endl;
+          cout << "sd of ego car : <" << pred_s << ", " << car_d << ">" << endl;
           for (int i = 0; i < sensor_fusion.size(); ++i) {
             double d = sensor_fusion[i][idx_D];
             double vx = sensor_fusion[i][idx_VX];
@@ -272,7 +270,7 @@ int main() {
             double vn = sqrt(vx*vx + vy*vy);            
             double other_s = sensor_fusion[i][idx_S];
             double ahead_s = other_s + (double)pre_size*0.02*vn; // naive prediction of the car ahead
-            double diff = ahead_s - car_s; 
+            double diff = ahead_s - pred_s; 
             cout << "sd of car #" << sensor_fusion[i][idx_ID] << " : <" << diff << ", " << d << ">" << endl;     
 
             // **[1]** set some flag for cars on the same lane
@@ -307,8 +305,8 @@ int main() {
           // now handle too close case
           if (too_close) {
             ref_vel -= 0.224; // about 5m/s^2        
-            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10;
-            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10; 
+            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5;
+            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
             if      (l_ok &&  r_ok) {
               if (gap_l > gap_r) lane--;
               else               lane++; 
@@ -334,7 +332,7 @@ int main() {
 
 
 
-          vector<double> sd2xy = getXY(car_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          vector<double> sd2xy = getXY(pred_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
           // cout << "according to simulators s & d: " << '|' << sd2xy[0] << ',' << sd2xy[1] << '|' << endl;
           // cout << "directly, " << '|' << car_x << ',' << car_y << '|' << endl;
            
@@ -384,7 +382,7 @@ int main() {
 
           // append more points for building spline
           for (int i = 1; i <= 3; ++i) {
-            vector<double> wp = getXY(car_s+i*30, 2+4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> wp = getXY(pred_s+i*30, 2+4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
             ptsx.push_back(wp[0]);
             ptsy.push_back(wp[1]); 
           }
