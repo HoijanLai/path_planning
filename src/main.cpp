@@ -254,7 +254,7 @@ int main() {
           cout << "number of detected cars : " << sensor_fusion.size() << endl;
 
           double safe_dist = 30.0; 
-          double safe_gap = 30.0;
+          double safe_gap = 40.0;
 
           bool too_close = false; // whether there's a car close enough ahead
           double s_ul =  99999, s_ur =  99999; // ul: upper left
@@ -294,8 +294,8 @@ int main() {
           }
 
 
-          if (s_ur > s_u) s_ur = s_u;
-          if (s_ul > s_u) s_ul = s_u;
+          // if (s_ur > s_u) s_ur = s_u;
+          // if (s_ul > s_u) s_ul = s_u;
           
           double gap_l = s_ul - s_ll;
           double gap_r = s_ur - s_lr;
@@ -304,16 +304,15 @@ int main() {
           cout << "|" << s_ll << "|" << "0000000" << "|" << s_lr << "|" << endl;
           // now handle too close case
           if (too_close) {
-            double pre_lane = lane;
-            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5;
-            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
+            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 20 && s_ll <= -15;
+            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 20 && s_lr <= -15; 
             if      (l_ok &&  r_ok) {
               if (gap_l > gap_r) lane--;
               else               lane++; 
             } 
             else if (l_ok && !r_ok) lane--;
             else if (r_ok && !l_ok) lane++; 
-            if (pre_lane == lane) ref_vel -= 0.224;
+            ref_vel -= 0.224;
           }
           else if (ref_vel < target_vel) {
             ref_vel += 0.224;
@@ -418,7 +417,7 @@ int main() {
           double des_y = s(des_x);
           double des_dist = sqrt(des_x*des_x + des_y*des_y);
           double x_inc = des_x / (des_dist/(0.02*ref_vel/2.24));
-          for (int i = 0; i < 50 - pre_size; ++i) {
+          for (int i = 0; i < 75 - pre_size; ++i) {
             double x_val = (i+1) * x_inc;
             double y_val = s(x_val);
             double next_x_val = x_val*cos(ref_yaw) - y_val*sin(ref_yaw) + ref_x;
