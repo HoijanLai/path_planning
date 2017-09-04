@@ -201,7 +201,11 @@ int main() {
   int lane = 1;
   double target_vel = 49.5;
   double ref_vel = 0;
-  h.onMessage([&target_vel,&ref_vel,&lane,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+
+  enum state {KL, LCL, LCR, PLCL, PLCR}; 
+  state car_state = KL;
+
+  h.onMessage([&car_state,&target_vel,&ref_vel,&lane,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -253,9 +257,10 @@ int main() {
           cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
           cout << "number of detected cars : " << sensor_fusion.size() << endl;
 
-          double safe_dist = 30.0; 
-          double safe_gap = 40.0;
-
+          // ==========================================
+          // drqw useful information form sensor fusion
+          // ==========================================
+          double safe_dist = 20.0; 
           bool too_close = false; // whether there's a car close enough ahead
           double s_ul =  99999, s_ur =  99999; // ul: upper left
           double s_ll = -99999, s_lr = -99999;
@@ -274,7 +279,7 @@ int main() {
             cout << "sd of car #" << sensor_fusion[i][idx_ID] << " : <" << diff << ", " << d << ">" << endl;     
 
             // **[1]** set some flag for cars on the same lane
-            if (d <= (4*lane+2)+2 && d >= (4*lane+2)-2 && diff > 0) {
+            if (d <= (4*lane+2)+2.5 && d >= (4*lane+2)-2.5 && diff > 0) {
               if (diff <= safe_dist) too_close = true;
               if (diff < s_u) {
                 s_u = diff;
@@ -292,33 +297,50 @@ int main() {
               else if (diff < 0 && diff > s_ll) s_ll = diff;
             } 
           }
-
-
-          // if (s_ur > s_u) s_ur = s_u;
-          // if (s_ul > s_u) s_ul = s_u;
-          
-          double gap_l = s_ul - s_ll;
-          double gap_r = s_ur - s_lr;
           cout << "----------------------------" << endl;
           cout << "|" << s_ul << "|" << "0000000" << "|" << s_ur << "|" << endl;
           cout << "|" << s_ll << "|" << "0000000" << "|" << s_lr << "|" << endl;
-          // now handle too close case
-          if (too_close) {
-            bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 20 && s_ll <= -15;
-            bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 20 && s_lr <= -15; 
-            if      (l_ok &&  r_ok) {
-              if (gap_l > gap_r) lane--;
-              else               lane++; 
-            } 
-            else if (l_ok && !r_ok) lane--;
-            else if (r_ok && !l_ok) lane++; 
-            ref_vel -= 0.224;
+ 
+         
+           
+          // =================================
+          // the FSM logic (setting car_state)
+          // =================================         
+          double safe_gap = 20.0;
+
+          double gap_l = s_ul - s_ll;
+          double gap_r = s_ur - s_lr;
+          bool changing = fabs(4*lane+2 - car_d) > 1.0;  
+          cout << "changing: " << changing << endl;
+          bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5;
+          bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
+          if (changing) car_state = KL;
+          else {
+            if      (l_ok &&  r_ok) 
+              if (gap_l > gap_r) car_state = LCL;
+              else               car_state = LCR; 
+             
+            else if (l_ok && !r_ok) car_state = LCL;
+            else if (r_ok && !l_ok) car_state = LCR; 
+            else                    car_state = KL; 
           }
-          else if (ref_vel < target_vel) {
+
+          // ==================
+          // realize any state 
+          // ================== 
+          if (too_close && ref_vel > v_u) {
+            ref_vel -= 0.224;
+            if      (LCL == car_state) lane--; 
+            else if (LCR == car_state) lane++;
+          }
+          else if (ref_vel < target_vel) { 
             ref_vel += 0.224;
-          } 
+          }         
 
           
+          // ==========================
+          // building a planning spline
+          // ==========================
 
           // points to build spline
           vector<double> ptsx;
@@ -330,13 +352,11 @@ int main() {
           double ref_y = car_y;
           double ref_yaw = deg2rad(car_yaw);
 
-
-
           vector<double> sd2xy = getXY(pred_s, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
           // cout << "according to simulators s & d: " << '|' << sd2xy[0] << ',' << sd2xy[1] << '|' << endl;
           // cout << "directly, " << '|' << car_x << ',' << car_y << '|' << endl;
            
-          // nothing to refer, then use the car as starting reference
+          // if nothing to refer, use the car as starting reference
           if (pre_size < 2) {
             double pre_car_x = car_x - cos(ref_yaw);
             double pre_car_y = car_y - sin(ref_yaw);
@@ -350,14 +370,14 @@ int main() {
           // if sufficient to refer the previous 
           else {
             /* TEST track */
-           // if (pre_size > 10) { 
-           //   cout << "--------------------" << endl;             
-           //   cout << "previous path with " << pre_size << " points" << endl;
-           //   cout << "the first five:" << endl;
-           //   for (int i = pre_size - 5; i < pre_size; ++i) cout << '{' << previous_path_x[i] << ", " << previous_path_y[i] << '}' << endl;
-           //   cout << "the last five:" << endl;
-           //   for (int i = 0; i < 5; ++i) cout << '{' << previous_path_x[i] << ", " << previous_path_y[i] << '}' << endl;
-           // }
+            // if (pre_size > 10) { 
+            //   cout << "--------------------" << endl;             
+            //   cout << "previous path with " << pre_size << " points" << endl;
+            //   cout << "the first five:" << endl;
+            //   for (int i = pre_size - 5; i < pre_size; ++i) cout << '{' << previous_path_x[i] << ", " << previous_path_y[i] << '}' << endl;
+            //   cout << "the last five:" << endl;
+            //   for (int i = 0; i < 5; ++i) cout << '{' << previous_path_x[i] << ", " << previous_path_y[i] << '}' << endl;
+            // }
             /* END track test */
 
             ref_x = previous_path_x[pre_size - 1];
@@ -375,9 +395,9 @@ int main() {
           }
 
           /* TEST track */
-          cout << "--------------------" << endl;
-          cout << "============|" << "reference xy : " << ref_x << ", " << ref_y << endl;
-          cout << "============|" << "reference yaw: " << ref_yaw << endl;
+          // cout << "--------------------" << endl;
+          // cout << "============|" << "reference xy : " << ref_x << ", " << ref_y << endl;
+          // cout << "============|" << "reference yaw: " << ref_yaw << endl;
           /* END track test */
 
           // append more points for building spline
@@ -405,6 +425,9 @@ int main() {
           tk::spline s;
           s.set_points(ptsx, ptsy);
 
+          // ================================
+          // sample waypoints from the spline
+          // ================================
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
@@ -417,7 +440,7 @@ int main() {
           double des_y = s(des_x);
           double des_dist = sqrt(des_x*des_x + des_y*des_y);
           double x_inc = des_x / (des_dist/(0.02*ref_vel/2.24));
-          for (int i = 0; i < 75 - pre_size; ++i) {
+          for (int i = 0; i < 30 - pre_size; ++i) {
             double x_val = (i+1) * x_inc;
             double y_val = s(x_val);
             double next_x_val = x_val*cos(ref_yaw) - y_val*sin(ref_yaw) + ref_x;
@@ -427,7 +450,7 @@ int main() {
           }   
 
           /* TEST track */
-         // for (int i = next_x_vals.size() - 5; i < next_x_vals.size(); ++i) cout << '<' << next_x_vals[i] << ", " << next_y_vals[i] << '>' << endl;
+          // for (int i = next_x_vals.size() - 5; i < next_x_vals.size(); ++i) cout << '<' << next_x_vals[i] << ", " << next_y_vals[i] << '>' << endl;
           /* END track test */
 
           // END TODO
