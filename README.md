@@ -1,99 +1,140 @@
-## Path Planning
+# CarND-Path-Planning-Project
+Self-Driving Car Engineer Nanodegree Program
+   
+### Simulator.
+You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
+
+### Goals
+In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 50 m/s^3.
+
+#### The map of the highway is in data/highway_map.txt
+Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
+
+The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
+
+## Basic Build Instructions
+
+1. Clone this repo.
+2. Make a build directory: `mkdir build && cd build`
+3. Compile: `cmake .. && make`
+4. Run it: `./path_planning`.
+
+Here is the data provided from the Simulator to the C++ Program
+
+#### Main car's localization Data (No Noise)
+
+["x"] The car's x position in map coordinates
+
+["y"] The car's y position in map coordinates
+
+["s"] The car's s position in frenet coordinates
+
+["d"] The car's d position in frenet coordinates
+
+["yaw"] The car's yaw angle in the map
+
+["speed"] The car's speed in MPH
+
+#### Previous path data given to the Planner
+
+//Note: Return the previous list but with processed points removed, can be a nice tool to show how far along
+the path has processed since last time. 
+
+["previous_path_x"] The previous list of x points previously given to the simulator
+
+["previous_path_y"] The previous list of y points previously given to the simulator
+
+#### Previous path's end s and d values 
+
+["end_path_s"] The previous list's last point's frenet s value
+
+["end_path_d"] The previous list's last point's frenet d value
+
+#### Sensor Fusion Data, a list of all other car's attributes on the same side of the road. (No Noise)
+
+["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates. 
+
+## Details
+
+1. The car uses a perfect controller and will visit every (x,y) point it recieves in the list every .02 seconds. The units for the (x,y) points are in meters and the spacing of the points determines the speed of the car. The vector going from a point to the next point in the list dictates the angle of the car. Acceleration both in the tangential and normal directions is measured along with the jerk, the rate of change of total Acceleration. The (x,y) point paths that the planner recieves should not have a total acceleration that goes over 10 m/s^2, also the jerk should not go over 50 m/s^3. (NOTE: As this is BETA, these requirements might change. Also currently jerk is over a .02 second interval, it would probably be better to average total acceleration over 1 second and measure jerk from that.
+
+2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
+
+## Tips
+
+A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
 
 ---
 
-### Introduction
-This is a path planning project for solving a lane changing problems for self-driving car. 
+## Dependencies
 
-### Result
+* cmake >= 3.5
+ * All OSes: [click here for installation instructions](https://cmake.org/install/)
+* make >= 4.1
+  * Linux: make is installed by default on most Linux distros
+  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
+  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
+* gcc/g++ >= 5.4
+  * Linux: gcc / g++ is installed by default on most Linux distros
+  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
+  * Windows: recommend using [MinGW](http://www.mingw.org/)
+* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
+  * Run either `install-mac.sh` or `install-ubuntu.sh`.
+  * If you install from source, checkout to commit `e94b6e1`, i.e.
+    ```
+    git clone https://github.com/uWebSockets/uWebSockets 
+    cd uWebSockets
+    git checkout e94b6e1
+    ```
 
-link: https://youtu.be/DnvvD-Ixwh4
+## Editor Settings
 
-Behaviors include:
-* Staying on its lane
-* Switching lane when needed
-* Smoothly following planning waypoints
-* No collision[*]
+We've purposefully kept editor configuration files out of this repo in order to
+keep it as simple and environment agnostic as possible. However, we recommend
+using the following settings:
 
-_*not fully tested_
+* indent using spaces
+* set tab width to 2 spaces (keeps the matrices in source code aligned)
 
-### Method
-* Logic
-  There're three main target of the car in this problem:
+## Code Style
 
-  * To staying its lane when there's no other cars near ahead
-  * To keeping an relatively high speed
-  * To avoid any collision
+Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
 
-  Target 1 is pretty easy to realize. To solve the second problem, the ego car should be able to change lane when the car upfront is running slow. In this case, the car should surpass the car upfront to keep desired speed, which degrades to a simple lane changing problem. 
+## Project Instructions and Rubric
 
-  In the simulator, the car is guided by a series of planning waypoints given by the program, so lane changing corresponds to switching the latest waypoints to adjacent lanes when it is safe to do so.
-
-* Finite states machine
-
-  The car decides whether it is safe to change lane by looking at the sensor fusion data, which is basically about where are the other cars locate and how they move.
-
-  A lane changing is allowed when the conditions below are fulfilled:
-
-  * The car is not current switching lane
-  * There's at least one sufficient gap between two cars in a row on the desired lane.
-  * The desired gap is on a comfortable location[*]. 
-
-  _*no support for an initiative lane change yet_
-
-  * The car is correctly aligned with a gap
-
-  Here are the code for state transitions:
-
-  ```c++
-  double safe_gap = 20.0;
-  double gap_l = s_ul - s_ll; // s_ul denotes the s coordinate of the car upfront on the left lane (upper left) 
-  double gap_r = s_ur - s_lr;
-
-  bool changing = fabs(4*lane+2 - car_d) > 1.0; // whether the ego car is changing lane
-  cout << "changing: " << changing << endl;
-
-  bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5; 
-
-  bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
-
-  if (changing) car_state = KL;
-  else {
-    if      (l_ok &&  r_ok) 
-      if (gap_l > gap_r) car_state = LCL;
-      else               car_state = LCR; 
-    
-    else if (l_ok && !r_ok) car_state = LCL;
-    else if (r_ok && !l_ok) car_state = LCR; 
-    else                    car_state = KL; 
-  }
-  ```
-
-   
+Note: regardless of the changes you make, your project must be buildable using
+cmake and make!
 
 
+## Call for IDE Profiles Pull Requests
 
-* Spline
+Help your fellow students!
 
-  A spline is fitted to some knots we set including the newly visited ones and  the ones for realizing the latest state.
+We decided to create Makefiles with cmake to keep this project as platform
+agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
+that students don't feel pressured to use one IDE or another.
 
-  The plan starts with a series of waypoints that guides the car to keep its current lane. The number of waypoints are fixed. The car realizes the first couple of them in every timestep and in the next timestep, some new waypoints are added to the end of the plan to keep the length of the plan. 
+However! I'd love to help people get up and running with their IDEs of choice.
+If you've created a profile for an IDE that you think other students would
+appreciate, we'd love to have you add the requisite profile files and
+instructions to ide_profiles/. For example if you wanted to add a VS Code
+profile, you'd add:
 
-  The spline functionality is responsible for smoothing the plan and preventing jerking. It works like magic and saves me some cost functions stuff.
+* /ide_profiles/vscode/.vscode
+* /ide_profiles/vscode/README.md
 
-  Reference: http://kluge.in-chemnitz.de/opensource/spline/
+The README should explain what the profile does, how to take advantage of it,
+and how to install it.
 
-### Improvement
-* Initiative Lane Change
+Frankly, I've never been involved in a project with multiple IDE profiles
+before. I believe the best way to handle this would be to keep them out of the
+repo root to avoid clutter. My expectation is that most profiles will include
+instructions to copy files to a new location to get picked up by the IDE, but
+that's just a guess.
 
-  For now, the finite states machine includes only three states: keep lane, lane change left and lane change right. It is sufficient to drive safely, but is a bit passive. More states should be included for initiative lane change, for example, the car should be able to decelerate and align with a comfortable gap instead of waiting a gap to come.
+One last note here: regardless of the IDE used, every submitted project must
+still be compilable with cmake and make./
 
-* Emergency Handling
+## How to write a README
+A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
-  RPCs in the simulator seems to be really responsible on road. In reality, some drivers will act pretty unpredictable like taking immediate brakes or taking lane change without looking at the rearview. 
-
-* Reinforcement Learning 
-
-  The core idea of this project is to write some rules for state transitions. But rules are endless because the environment is way more complicated. I found this project is pretty similar to the Deep Traffic playground by MIT. Hopefully we can introduce the neural network in the future.
-
-  Reference: http://selfdrivingcars.mit.edu/deeptrafficjs/
