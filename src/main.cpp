@@ -260,7 +260,7 @@ int main() {
           // ==========================================
           // drqw useful information form sensor fusion
           // ==========================================
-          double safe_dist = 20.0; 
+          double safe_dist = 25.0; 
           bool too_close = false; // whether there's a car close enough ahead
           double s_ul =  99999, s_ur =  99999; // ul: upper left
           double s_ll = -99999, s_lr = -99999;
@@ -312,8 +312,8 @@ int main() {
           double gap_r = s_ur - s_lr;
           bool changing = fabs(4*lane+2 - car_d) > 1.0;  
           cout << "changing: " << changing << endl;
-          bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 10 && s_ll <= -5;
-          bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 10 && s_lr <= -5; 
+          bool l_ok = lane > 0 && gap_l >= safe_gap && s_ul >= 12 && s_ll <= -5;
+          bool r_ok = lane < 2 && gap_r >= safe_gap && s_ur >= 12 && s_lr <= -5; 
           if (changing) car_state = KL;
           else {
             if      (l_ok &&  r_ok) 
